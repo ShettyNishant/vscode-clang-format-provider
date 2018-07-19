@@ -1,5 +1,10 @@
 # README
 
+## This extension is forked from XAVERH's repo to fix few things as per our project requirements. Full credit of this work goes to XAVERH. Thanks to the orignal author this work was done.
+
+We only fixed the new-line that used to come after the access modifier for APEX files.
+
+
 [Clang-Format](http://clang.llvm.org/docs/ClangFormat.html) is a tool to format C/C++/Java/JavaScript/Objective-C/Objective-C++/Protobuf code. It can be configured with a config file within the working folder or a parent folder. Configuration see: http://clang.llvm.org/docs/ClangFormatStyleOptions.html
 
 

@@ -114,9 +114,202 @@ export class ClangDocumentFormattingEditProvider implements vscode.DocumentForma
       parser.write(xml);
       parser.end();
 
-    });
+        //Get the complete text and start parsing it out
+        codeContent=document.getText();
+        var codeElements= codeContent.split("\n");
+        var finalContent="";
+        var flgFoundPrev = false;
+        var flgFoundPrevBlank =false;
+        var flgFoundPrevAgain=false;
+        var trimElement=false;
+        var isClassFile=fn.endsWith(".cls");;
+        var fn= document.fileName;
+        var addHeader="";
+        
+         //--------------------------------------------------
+         //Add header if its not there at the TOP of the file
+         //--------------------------------------------------
+         if(isClassFile)
+         {
+          if(!codeElements[0].trim().startsWith("/*"))
+          {
+            //Add Comments Block at top if its missing
+             addHeader="/**\n * @group \n * @description\n */\n" 
+          }
+         }
+         //--------------------------------------------------
+
+        codeElements.forEach(element => {
+          //Remove multiple consecutive spaces 
+         var nonwhitespaceindx= element.search(/\S|$/)
+         element= " ".repeat(nonwhitespaceindx) +  element.substr(nonwhitespaceindx).replace(/  +/g, ' ');
+        
+         
+          //------------------------------------
+          //Getting Access Modifier on same line
+          //------------------------------------
+          var txt=element.trim().toUpperCase();
+          trimElement=false;
+          if(flgFoundPrev) 
+          {
+            if(!flgFoundPrevAgain)
+            {
+            finalContent = finalContent.trim()  + " "; 
+            trimElement=true;
+            }
+          }
+          else{
+            if(finalContent!="")
+            {
+              if(!(txt=="" && flgFoundPrevBlank))
+              {
+                finalContent = finalContent.trim() + "\n";
+              }
+            }
+          }
+          
+          if (txt=="PUBLIC" || txt=="PRIVATE" || txt=="PROTECTED")
+          {
+            if(flgFoundPrev){
+            flgFoundPrevAgain=true;
+            }
+            else
+            {
+              flgFoundPrev=true;
+              flgFoundPrevAgain=false;
+              element= " " + element; // Adding a space to intend this line as well 
+            }
+          }
+          else
+          {
+            flgFoundPrev=false;
+            flgFoundPrevAgain=false;
+          }
+          //------------------------------------
+
+          //-----------------------
+          //Mutiple blank lines Fix
+          //-----------------------
+          if(txt=="" && flgFoundPrevBlank)
+          {
+            flgFoundPrevBlank=true;
+          }
+          else
+          {
+            if(txt=="")
+            { 
+              flgFoundPrevBlank=true;
+              element=txt;
+            }
+            else{
+              flgFoundPrevBlank=false;
+            }
+            if(trimElement)
+            {
+              finalContent = finalContent +  element.trim();
+            }
+            else {
+              finalContent = finalContent +  element.replace(/ *$/, '');
+            }
+          }
+          //-------------------
+        });
+        
+            finalContent=addHeader+finalContent;
+      
+            vscode.window.activeTextEditor.edit(function (editor) {
+              
+              let documentEndPosition: vscode.Position =
+              new vscode.Position(document.lineCount - 1,
+                  document.lineAt(new vscode.Position(document.lineCount - 1, 0)).range.end.character);
+                    let editRange: vscode.Range = new vscode.Range(new vscode.Position(0, 0), documentEndPosition);
+              return editor.replace(editRange,finalContent );
+          });
+
+          setTimeout(this.highLightSensitiveContent, 500);
+      });
   }
 
+
+  //Hightlight lines/code which needs developer's attention
+  private  highLightSensitiveContent() 
+  {
+    var document=vscode.window.activeTextEditor.document;
+    var fn= document.fileName;
+    const debugerPos: vscode.DecorationOptions[] = [];
+    const consolePos: vscode.DecorationOptions[] = [];
+    const text = document.getText();
+    let match;
+
+    
+        // Identify the debugger and console.log statements in JS files
+        if(fn.endsWith(".js"))
+        {
+          var regEx = /debugger/g;
+
+          while (match = regEx.exec(text)) {
+            const startPos = document.positionAt(match.index);
+            const endPos = document.positionAt(match.index + match[0].length);
+            const decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: 'Remove debugger; from JS files' };
+          
+            debugerPos.push(decoration);
+            
+          }
+
+          regEx = /console.log/g;
+
+          while (match = regEx.exec(text)) {
+            const startPos = document.positionAt(match.index);
+            const endPos = document.positionAt(match.index + match[0].length);
+            const decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: 'Remove console.log() from prod code' };
+          
+            consolePos.push(decoration);
+            
+          }
+        }
+
+        //Line Greater than 100 so highlight it
+        var lines=    document.lineCount;
+        while(lines>0)
+        {
+          var line=document.lineAt(lines-1).text;
+
+          if(line.length>100)
+          {
+            const startPos = document.lineAt(lines-1).range.start;
+            const endPos =  document.lineAt(lines-1).range.end;
+            const decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: 'Line greater than 100 chars' };
+          
+            consolePos.push(decoration);
+          }
+          lines=lines-1;
+        }
+    
+
+        const highLightText = vscode.window.createTextEditorDecorationType({
+          backgroundColor: 'rgba(255,0,0,0.3)'
+        });
+        const debuggerText = vscode.window.createTextEditorDecorationType({
+          borderWidth: '1px',
+          borderStyle: 'solid',
+          overviewRulerColor: 'red',
+          color: 'red',
+          overviewRulerLane: vscode.OverviewRulerLane.Right,
+          light: {
+            // this color will be used in light color themes
+            borderColor: 'darkred'
+          },
+          dark: {
+            // this color will be used in dark color themes
+            borderColor: 'lightred'
+          }
+        });
+        
+        vscode.window.activeTextEditor.setDecorations(debuggerText, debugerPos);
+        vscode.window.activeTextEditor.setDecorations(highLightText, consolePos);
+  }
+
+  
   /// Get execute name in clang-format.executable, if not found, use default value
   /// If configure has changed, it will get the new value
   private getExecutablePath() {
