@@ -55,4 +55,5 @@ Some examples:
   under your home directory.
 
 ## Source code
-Available on github: https://github.com/xaverh/vscode-clang-format-provider
+Orignal Source code is available on github: https://github.com/xaverh/vscode-clang-format-provider
+This version code is available on github: https://github.com/ShettyNishant/vscode-clang-format-provider.git
